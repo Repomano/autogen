@@ -25,8 +25,6 @@ import numpy as np
 import openai
 from openai import OpenAI
 
-MAX_THREADS = 5
-SAVE_PATH = "/home/matt/Documents/GitHub/coder-agent/scraper/codes" #to_do  
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "...")
 PINECONE_API_KEY="..."
 objective=f"""Using pytorch, pandas, matplotlib, tensorflow and all ML libraries.
@@ -46,11 +44,7 @@ objective=f"""Using pytorch, pandas, matplotlib, tensorflow and all ML libraries
                 \n with values in format:\n
                 4Y02053,2023-02-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.0,73.0,79.0,17.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
                 """
-searched_pages=[]
-pages = []
-visited_pages = []
-links = []
-device_map = {"": 0}
+
 
 
 class DAGNode:
@@ -116,6 +110,7 @@ class Scraper:
         self.tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
         self.model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
         self.dag = DAG()
+        self.visited_pages = []
 
     def limit_tokens_from_string(self,string: str, model: str, limit: int) -> str:
         try:
@@ -191,7 +186,6 @@ class Scraper:
         return similarity_scores, max_index
 
     def prompt_for_chat(self,objective):
-        #input_searched_pages="\n".join(output_chat_list)
         input_chat=f"""Consider the following objective: '{objective}'.
                                 \nGenerate a Github topic title that contains: 'pythorch forecast'.
                                 \nFor example: 'How to forecast with PyTorch'. or 'Forecasting with PyTorch'.
@@ -286,7 +280,7 @@ class Scraper:
         else:
             for a_tag in soup.find_all('a', href=True):
                 tag='https://github.com'+a_tag['href']
-                if 'tree/' in tag and tag not in visited_pages and page_link in tag and '/.' not in tag:
+                if 'tree/' in tag and tag not in self.visited_pages and page_link in tag and '/.' not in tag:
                     repo_links.append(tag)
 
         return repo_links 
@@ -304,23 +298,23 @@ class Scraper:
     def crawl(self,page_link):
         try:
             thread_driver = webdriver.Chrome(options=self.chrome_options)
-            if page_link not in visited_pages:
-                visited_pages.append(page_link)
+            if page_link not in self.visited_pages:
+                self.visited_pages.append(page_link)
                 if self.output_chat_list:
                     thread_driver.get(page_link)
-                    local_links=self.scrape(thread_driver, page_link,len(visited_pages))
+                    local_links=self.scrape(thread_driver, page_link,len(self.visited_pages))
                     
                     if local_links is not None:
                         local_links = set(local_links)
 
                         for link in local_links.copy():
-                            for visited_page in visited_pages:
+                            for visited_page in self.visited_pages:
                                 if link == visited_page:
                                     local_links.remove(link)
                     
                     if len(local_links) != 0:
                         for link in local_links:
-                            if link not in visited_pages:
+                            if link not in self.visited_pages:
                                 self.dag.add_edge(page_link, link)
                                 if '.py' not in page_link and 'ipynb' not in page_link:
                                     self.crawl(link)
