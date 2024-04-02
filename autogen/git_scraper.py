@@ -28,23 +28,17 @@ from openai import OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "...")
 PINECONE_API_KEY="..."
 objective=f"""Using pytorch, pandas, matplotlib, tensorflow and all ML libraries.
-                The objective of the work is to forecast the number of passengers arriving at the various security gates of Fiumicino and Ciampino airports.
+                The objective of the work is to forecast the number of passengers arriving at the various security gates airports.
                 Forecasts must be calculated with:
                 • Time depth of one month
                 • 30 minute granularity
                 \n After having performed some data cleaning and preparation, develop a model to predict the values in dataframe from file located in folder
-                '/home/matt/Documents/GitHub/stored-procedure-bot/babyagi/y_T1ovest30_gen2023.csv'.
-                \n Use the split of /home/matt/Documents/GitHub/stored-procedure-bot/babyagi/y_T1ovest30_gen2023.csv for training max 10 epoch.
+                'my_dataset.csv'.
+                \n Use the split of /home/matt/Documents/my_dataset.csv for training max 10 epoch.
                 Note carefully that from 3rd column there number of passengers going through a terminal gate every 30 minutes.
                 \n Make forecast of these values.
-                Theses are the two tables to be used for the task and represnt the number of person arriving to a terminal every 30 minutes.\n one table for train and the othe rfor validation from y_T1ovest30_gen2023. \n
-                The first table contains the following columns:\n
-                y_T1ovest30_gen2023 validation set is:\n
-                COD_VETT_VOLO,DAY,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30
-                \n with values in format:\n
-                4Y02053,2023-02-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.0,73.0,79.0,17.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+                Theses are the two tables to be used for the task and represnt the number of person arriving to a terminal every 30 minutes.\n one table for train and the othe rfor validation from /home/matt/Documents/my_dataset.csv. \n
                 """
-
 
 
 class DAGNode:
@@ -89,15 +83,6 @@ class DAG:
                 if child in self.nodes:
                     self.nodes[child].parents.add(parent)
 
-class Page:
-    def __init__(self, url, title, content):
-        self.url = url
-        self.title = title
-        self.content = content
-
-    def __repr__(self):
-        return f'Title = {self.title} \n URL = {self.url} \n Content = "{self.content}"'
-
 
 class Scraper:
     def __init__(self):
@@ -106,7 +91,6 @@ class Scraper:
         self.chrome_options.add_argument("--headless=new")
         self.chrome_options.headless = True
         self.output_chat_list=['dead-page-title']
-        # Load pre-trained tokenizer and model
         self.tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
         self.model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
         self.dag = DAG()
@@ -116,12 +100,9 @@ class Scraper:
         try:
             encoding = tiktoken.encoding_for_model(model)
         except:
-            encoding = tiktoken.encoding_for_model('gpt2')  # Fallback for others.
-
+            encoding = tiktoken.encoding_for_model('gpt2') 
         encoded = encoding.encode(string)
-
         return encoding.decode(encoded[:limit])
-
 
     def openai_call(self,
         prompt: str,
@@ -131,7 +112,6 @@ class Scraper:
     ):
         while True:
                 if not model.lower().startswith("gpt-"):
-                    # Use completion API
                     response = openai.Completion.create(
                         engine=model,
                         prompt=prompt,
@@ -154,7 +134,6 @@ class Scraper:
                     messages = [{"role": "system", "content": trimmed_prompt}]
                     response = client.chat.completions.create(
                         model=model,
-                        #api_key=OPENAI_API_KEY,
                         messages=messages,
                         temperature=temperature,
                         max_tokens=max_tokens,
@@ -164,7 +143,6 @@ class Scraper:
                     return response.choices[0].message.content.strip()
 
 
-    # Function to generate sentence embeddings
     def generate_embedding(self,sentence):
         input_ids = self.tokenizer(sentence, return_tensors="pt", padding=True, truncation=True)['input_ids']
         with torch.no_grad():
